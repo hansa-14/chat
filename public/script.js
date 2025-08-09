@@ -5,21 +5,22 @@ let currentUserId = null;
 let currentUsername = null;
 
 const usersListEl = document.getElementById('users');
+const chatsListEl = document.getElementById('chatsList');
 const messagesEl = document.getElementById('messages');
 const inputEl = document.getElementById('input');
 const formEl = document.getElementById('form');
 const fileBtn = document.getElementById('fileBtn');
 const fileInput = document.getElementById('fileInput');
 const chatHeader = document.getElementById('chat-header');
-const createGroupBtn = document.getElementById('createGroupBtn');
 
+const createGroupBtn = document.getElementById('createGroupBtn');
 const groupModal = document.getElementById('groupModal');
 const closeModal = document.getElementById('closeModal');
 const groupNameInput = document.getElementById('groupName');
 const groupUsersList = document.getElementById('groupUsersList');
 const createGroupConfirmBtn = document.getElementById('createGroupConfirmBtn');
 
-let users = []; // All users from server
+let users = [];
 
 // Fetch current user info
 fetch('/current-user')
@@ -35,6 +36,7 @@ fetch('/current-user')
     window.location = '/login';
   });
 
+// Load users list
 function loadUsers() {
   fetch('/users')
     .then(res => res.json())
@@ -55,31 +57,60 @@ function renderUsers() {
   });
 }
 
-function startPrivateChat(user) {
-  if (currentChatId) {
-    socket.emit('leave', currentChatId);
-  }
-  // Ask server for private chat with this user
-  socket.emit('join private chat', user._id);
-  currentChatId = null;
-  chatHeader.innerHTML = `<h2>Chat with ${user.username}</h2>`;
+// Load chats list
+function loadChats() {
+  fetch('/chats')
+    .then(res => res.json())
+    .then(chats => {
+      chatsListEl.innerHTML = '';
+      chats.forEach(chat => {
+        const li = document.createElement('li');
+        if (chat.isGroup) {
+          li.textContent = chat.name;
+        } else {
+          const otherUser = chat.users.find(u => u._id !== currentUserId);
+          li.textContent = otherUser ? otherUser.username : 'Unknown';
+        }
+        li.addEventListener('click', () => joinChat(chat._id, li.textContent));
+        chatsListEl.appendChild(li);
+      });
+    });
+}
+
+// Join a chat (private or group)
+function joinChat(chatId, chatName) {
+  if (currentChatId) socket.emit('leave', currentChatId);
+  currentChatId = chatId;
+  chatHeader.innerHTML = `<h2>${chatName}</h2>`;
+  messagesEl.innerHTML = '';
   inputEl.disabled = false;
   fileBtn.disabled = false;
   formEl.querySelector('button[type=submit]').disabled = false;
-  messagesEl.innerHTML = '';
-  currentChatId = null; // will be set on first message or event
 
-  // Save chatId on first message
-  socket.once('chat messages', (msgs) => {
-    // Show messages
-    messagesEl.innerHTML = '';
-    msgs.forEach(msg => addMessage(msg));
-    if (msgs.length > 0) {
-      currentChatId = msgs[0].chatId || null;
-    }
+  socket.emit('join chat', chatId);
+  socket.once('chat messages', ({ chatId, messages }) => {
+    messages.forEach(addMessage);
   });
 }
 
+// Start private chat shortcut (uses join private chat)
+function startPrivateChat(user) {
+  if (currentChatId) socket.emit('leave', currentChatId);
+  chatHeader.innerHTML = `<h2>Chat with ${user.username}</h2>`;
+  messagesEl.innerHTML = '';
+  inputEl.disabled = false;
+  fileBtn.disabled = false;
+  formEl.querySelector('button[type=submit]').disabled = false;
+
+  socket.emit('join private chat', user._id);
+
+  socket.once('chat messages', ({ chatId, messages }) => {
+    currentChatId = chatId;
+    messages.forEach(addMessage);
+  });
+}
+
+// Add a message to UI
 function addMessage(msg) {
   const li = document.createElement('li');
   li.classList.add(msg.sender === currentUserId ? 'sent' : 'received');
@@ -110,15 +141,13 @@ function addMessage(msg) {
 formEl.addEventListener('submit', e => {
   e.preventDefault();
   if (!currentChatId) return alert('Select a chat first');
-  const text = inputEl.value;
-  if (text.trim() === '') return;
+  const text = inputEl.value.trim();
+  if (text === '') return;
   socket.emit('send message', { chatId: currentChatId, text });
   inputEl.value = '';
 });
 
-fileBtn.addEventListener('click', () => {
-  fileInput.click();
-});
+fileBtn.addEventListener('click', () => fileInput.click());
 
 fileInput.addEventListener('change', () => {
   if (fileInput.files.length === 0) return;
@@ -139,18 +168,12 @@ fileInput.addEventListener('change', () => {
 // Socket events
 
 socket.on('new message', msg => {
-  if (msg.chatId === currentChatId || !currentChatId) {
+  if (msg.chatId === currentChatId) {
     addMessage(msg);
   }
 });
 
-socket.on('messages read update', ({ chatId, messageIds, userId }) => {
-  if (chatId === currentChatId) {
-    // TODO: update read receipts UI
-  }
-});
-
-// Group chat modal handling
+// Group modal
 
 createGroupBtn.addEventListener('click', () => {
   groupModal.style.display = 'flex';
@@ -177,7 +200,9 @@ createGroupConfirmBtn.addEventListener('click', () => {
   const groupName = groupNameInput.value.trim();
   if (!groupName) return alert('Group name required');
 
-  const selectedUserIds = Array.from(groupUsersList.querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.value);
+  const selectedUserIds = Array.from(groupUsersList.querySelectorAll('input[type=checkbox]:checked'))
+    .map(cb => cb.value);
+
   if (selectedUserIds.length === 0) return alert('Select at least one user');
 
   fetch('/group', {
@@ -192,8 +217,3 @@ createGroupConfirmBtn.addEventListener('click', () => {
       loadChats();
     });
 });
-
-// Load all chats (groups and private) and show in sidebar or similar
-function loadChats() {
-  // TODO: Implement chat list UI and selection
-}
