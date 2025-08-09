@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>My Profile - Chat App</title>
+<style>
+  /* Dark theme styling */
+  body {
+    background-color: #121212;
+    color: #eee;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0; padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+  header {
+    width: 100%;
+    background: #1f1f1f;
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.7);
+  }
+  header h1 {
+    margin: 0;
+    font-weight: 600;
+  }
+  main {
+    flex-grow: 1;
+    width: 100%;
+    max-width: 480px;
+    background: #1e1e1e;
+    margin: 2rem auto;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 0 10px #000;
+  }
+  h2 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-weight: 600;
+    color: #4caf50;
+  }
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+  label {
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+  }
+  input[type="text"], textarea {
+    background-color: #2a2a2a;
+    border: none;
+    border-radius: 6px;
+    color: #eee;
+    padding: 0.75rem;
+    font-size: 1rem;
+    resize: vertical;
+  }
+  textarea {
+    min-height: 80px;
+  }
+  input[type="file"] {
+    color: #eee;
+  }
+  button {
+    background-color: #4caf50;
+    border: none;
+    border-radius: 6px;
+    color: black;
+    padding: 0.8rem;
+    font-size: 1rem;
+    cursor: pointer;
+    font-weight: 700;
+    transition: background-color 0.2s ease;
+  }
+  button:hover {
+    background-color: #45a049;
+  }
+  #profile-pic-preview {
+    display: block;
+    margin: 0 auto 1rem auto;
+    width: 120px;
+    height: 120px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 2px solid #4caf50;
+  }
+  #message {
+    margin-top: 1rem;
+    text-align: center;
+    font-weight: 600;
+  }
+  nav {
+    margin-top: 1rem;
+    text-align: center;
+  }
+  nav a {
+    color: #4caf50;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  nav a:hover {
+    text-decoration: underline;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>My Profile</h1>
+  <nav><a href="/index.html">Back to Chat</a></nav>
+</header>
+
+<main>
+  <form id="profileForm">
+    <img id="profile-pic-preview" src="https://via.placeholder.com/120?text=User" alt="Profile Picture" />
+    
+    <label for="profilePic">Change Profile Picture</label>
+    <input type="file" id="profilePic" accept="image/*" />
+
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" required minlength="3" maxlength="30" />
+
+    <label for="bio">Bio</label>
+    <textarea id="bio" name="bio" maxlength="150" placeholder="Write something about yourself..."></textarea>
+
+    <button type="submit">Save Profile</button>
+    <div id="message"></div>
+  </form>
+</main>
+
+<script>
+  const profileForm = document.getElementById('profileForm');
+  const usernameInput = document.getElementById('username');
+  const bioInput = document.getElementById('bio');
+  const profilePicInput = document.getElementById('profilePic');
+  const profilePicPreview = document.getElementById('profile-pic-preview');
+  const messageDiv = document.getElementById('message');
+
+  // Load current profile info
+  async function loadProfile() {
+    try {
+      const res = await fetch('/profile');
+      if (!res.ok) throw new Error('Failed to load profile');
+      const data = await res.json();
+
+      usernameInput.value = data.username || '';
+      bioInput.value = data.bio || '';
+      profilePicPreview.src = data.profilePicUrl || 'https://via.placeholder.com/120?text=User';
+    } catch (err) {
+      messageDiv.textContent = 'Error loading profile';
+      messageDiv.style.color = 'red';
+      console.error(err);
+    }
+  }
+
+  loadProfile();
+
+  // Preview profile pic on select
+  profilePicInput.addEventListener('change', () => {
+    const file = profilePicInput.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        profilePicPreview.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  profileForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    messageDiv.textContent = '';
+
+    const username = usernameInput.value.trim();
+    const bio = bioInput.value.trim();
+
+    if (username.length < 3) {
+      messageDiv.textContent = 'Username must be at least 3 characters';
+      messageDiv.style.color = 'red';
+      return;
+    }
+
+    try {
+      let profilePicUrl = null;
+
+      if (profilePicInput.files.length > 0) {
+        const formData = new FormData();
+        formData.append('file', profilePicInput.files[0]);
+
+        const uploadRes = await fetch('/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        if (!uploadRes.ok) throw new Error('Failed to upload profile picture');
+        const uploadData = await uploadRes.json();
+        profilePicUrl = uploadData.fileUrl;
+      }
+
+      // Send profile update
+      const res = await fetch('/profile', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ username, bio, profilePicUrl }),
+      });
+
+      if (res.ok) {
+        messageDiv.textContent = 'Profile updated successfully!';
+        messageDiv.style.color = '#4caf50';
+      } else {
+        const err = await res.text();
+        messageDiv.textContent = 'Error: ' + err;
+        messageDiv.style.color = 'red';
+      }
+    } catch (err) {
+      messageDiv.textContent = 'Error updating profile';
+      messageDiv.style.color = 'red';
+      console.error(err);
+    }
+  });
+</script>
+
+</body>
+</html>
