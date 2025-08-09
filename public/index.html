@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>WhatsApp-like Chat</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="chat-app">
+
+  <aside class="user-list">
+    <h3>Users</h3>
+    <ul id="users"></ul>
+    <a href="/logout" class="logout-btn">Logout</a>
+  </aside>
+
+  <section class="chat-section">
+    <header id="chat-header">
+      <h2>Select a user to chat</h2>
+    </header>
+
+    <ul id="messages" class="messages"></ul>
+
+    <form id="form" action="">
+      <input id="input" autocomplete="off" placeholder="Type a message..." disabled />
+      <button disabled>Send</button>
+    </form>
+  </section>
+
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="script.js"></script>
+
+</body>
+</html>
