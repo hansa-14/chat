@@ -1,31 +1,31 @@
 const mongoose = require('mongoose');
-const { Schema } = mongoose;
 
-// User schema
-const userSchema = new Schema({
-  username: { type: String, unique: true },
-  passwordHash: String,
-  online: Boolean,
+const UserSchema = new mongoose.Schema({
+  username: { type: String, unique: true, required: true },
+  passwordHash: { type: String, required: true },
+  online: { type: Boolean, default: false },
+  lastSeen: { type: Date },
+  bio: { type: String, default: '' },
+  profilePicUrl: { type: String, default: '' },
+  socketId: { type: String, default: null }
 });
 
-// Message schema
-const messageSchema = new Schema({
-  sender: { type: Schema.Types.ObjectId, ref: 'User' },
-  text: String,
-  fileUrl: String, // file message optional
+const MessageSchema = new mongoose.Schema({
+  sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  text: { type: String },
+  fileUrl: { type: String },
   timestamp: { type: Date, default: Date.now },
-  readBy: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+  readBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
 });
 
-// Chat schema (private or group)
-const chatSchema = new Schema({
+const ChatSchema = new mongoose.Schema({
   isGroup: { type: Boolean, default: false },
-  name: String,
-  users: [{ type: Schema.Types.ObjectId, ref: 'User' }],
-  messages: [messageSchema],
+  name: { type: String, default: '' },
+  users: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  messages: [MessageSchema]
 });
 
-const User = mongoose.model('User', userSchema);
-const Chat = mongoose.model('Chat', chatSchema);
+const User = mongoose.model('User', UserSchema);
+const Chat = mongoose.model('Chat', ChatSchema);
 
 module.exports = { User, Chat };
